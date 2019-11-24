@@ -1,35 +1,30 @@
-
-######################################
-#########__Injector Python__##########
-######################################
-#*Obs: so atende ao metodo CONNECT
-#*Palavras-chave:
-#[crlf] = \r\n
-#[netData] = request line. Ex.: CONNECT a.com:443 HTTP/1.0
-#[host] = host requisitado. Ex.: a.com
-#[port] = porta requisitada. Ex.: 443
-#[host_port] = conjuto host:port. Ex.: a.com:443
-#[protocol] = protocol utilizado. Ex.: HTTP/1.0
-
-
-###############__CONF__###############
-BIND_ADDR = '127.0.0.1'
-BIND_PORT = 8888
-PROXT_ADDR = '66.70.155.130'
-PROXY_PORT = 80
-PAYLOAD = 'CONNECT [host_port][delay_split][crlf]PUT /? HTTP/1.1[crlf]Host: m.youtube.com.br[crlf]'
-
-
-
+# -*- coding: utf-8 -*-
 import socket
 import thread
 import string
 import select
 
-TAM_BUFFER = 1024
-MAX_CLIENT_REQUEST_LENGTH = 1024 * 8
+banner = """\033[1;36m                                   
+ _____ _____ _____ _____ _         
+|   __|   __|  |  |  _  | |_ _ ___ 
+|__   |__   |     |   __| | | |_ -|
+|_____|_____|__|__|__|  |_|___|___|
+"""
+print(banner)
+print ("\033[1;36m=========[ \033[1;31mPROXY INJETOR \033[1;36m]=========\n")
+print ('\033[1;32m'+'Adicione as seguintes informações\nabaixo para a execução do Script..'+'\033[0m\n')
 
-#Monta uma payload
+BIND_ADDR = '127.0.0.1'
+BIND_PORT = 8989
+#PROXY
+PROXT_ADDR = raw_input ("\033[1;33mProxy\033[0m: ")
+#PORTA
+PROXY_PORT = 80
+#PAYLOAD
+PAYLOAD = 'CONNECT [host_port][delay_split][crlf]PUT /? HTTP/1.1[crlf]Host: m.youtube.com.br[crlf]'
+TAM_BUFFER = 16384
+MAX_CLIENT_REQUEST_LENGTH = 32768 * 8 
+
 def getReplacedPayload(payload, netData, hostPort, protocol):
 	str = payload.replace('[netData]', netData)
 	str = str.replace('[host_port]', (hostPort[0] + ':' + hostPort[1]))
@@ -39,7 +34,6 @@ def getReplacedPayload(payload, netData, hostPort, protocol):
 	str = str.replace('[crlf]', '\r\n')
 	return str
 
-#Separa o protocol HTTP de uma requisicao
 def getRequestProtocol(request):
 	inicio = request.find(' ', request.find(':')) + 1
 	str = request[inicio:]
@@ -47,7 +41,6 @@ def getRequestProtocol(request):
 	
 	return str[:fim]
 
-#Separa o host e porta de uma requisicao
 def getRequestHostPort(request):
 	inicio = request.find(' ') + 1
 	str = request[inicio:]
@@ -57,11 +50,9 @@ def getRequestHostPort(request):
 	
 	return hostPort.split(':')
 
-#Separa a request line de uma requisicao
 def getRequestNetData(request):
 	return request[:request.find('\r\n')]
 
-#Le uma request/response HTTP
 def receiveHttpMsg(socket):
 	len = 1
 	
@@ -74,11 +65,10 @@ def receiveHttpMsg(socket):
 	
 	return data
 	
-#Implementa o metodo CONNECT
 def doConnect(clientSocket, serverSocket, tamBuffer):
 	sockets = [clientSocket, serverSocket]
 	timeout = 0
-	print '<-> CONNECT started'
+	print '\033[1;32mProxy conectado !\033[0m'
 		
 	while 1:
 		timeout += 1
@@ -100,73 +90,49 @@ def doConnect(clientSocket, serverSocket, tamBuffer):
 				except:
 					break
 
-		if timeout == 60: break
+		if timeout == 1800: break
 	
-#Atente um cliente
 def acceptThread(clientSocket, clientAddr):
-	print '<-> Client connected: ', clientAddr
+	print '\033[1;33mInjetando Proxy\033[0m'
 	
-	#Le a requisicao cliente
 	request = receiveHttpMsg(clientSocket)
 	
-	#Valida o metodo. Somente CONNECT e aceito
 	if not request.startswith('CONNECT'):
-		print '<!> Client requisitou metodo != CONNECT!'
+		print '\033[1;33mRequer o metodo CONNECT!\033[0m'
 		clientSocket.sendall('HTTP/1.1 405 Only_CONNECT_Method!\r\n\r\n')
 		clientSocket.close()
 		thread.exit()
 	
-	#Separa dados da request enviada
 	netData = getRequestNetData(request)
 	protocol = getRequestProtocol(request)
 	hostPort = getRequestHostPort(netData)
-
-	#Gera a requisicao final a partir da payload, com base nos dados da request enviada
 	finalRequest = getReplacedPayload(PAYLOAD, netData, hostPort, protocol)
-	
-	#Envia a requisicao ao servidor proxy
 	proxySocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	
 	proxySocket.connect((PROXT_ADDR, PROXY_PORT))
 	proxySocket.sendall(finalRequest)
-	
-	#Recebe a resposta do servidor proxy
 	proxyResponse = receiveHttpMsg(proxySocket)
 	
-	print '<-> Status line: ' + getRequestNetData(proxyResponse)
-	
-	#Envia a resposta do proxy ao cliente
+	print '\033[1;33m! ' + getRequestNetData(proxyResponse)
 	clientSocket.sendall(proxyResponse)
-	
-	#Se a resposta do proxy contem codigo 200, executa metodo CONNECT
+
 	if proxyResponse.find('200 ') != -1:
 		doConnect(clientSocket, proxySocket, TAM_BUFFER)
 	
-	#Fecha a conexao com o cliente
-	print '<-> Client ended    : ', clientAddr
+	print '\033[1;31mConexão perdida !\n\033[1;33mAguardando Requisição...\033[0m'
 	proxySocket.close()
 	clientSocket.close()
 	thread.exit()
 
-	
-#############################__INICIO__########################################
-
-print '\n'
-print '==>Injector.py'
-print '-->Listening   : ' + BIND_ADDR + ':' + str(BIND_PORT)
-print '-->Remote proxy: ' + PROXT_ADDR + ':' + str(PROXY_PORT)
-print '-->Payload     : ' + PAYLOAD
-print '\n'
-
-#Configura a escuta numa porta local
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind((BIND_ADDR, BIND_PORT))
 server.listen(1)
 
-print '<-> Server listening... '
+print '\n\033[1;33mProxy em Execução...\033[0m'
 
-#Recebe o cliente e despacha uma thread para atende-lo
 while True:
 	clientSocket, clientAddr = server.accept()
 	thread.start_new_thread(acceptThread, tuple([clientSocket, clientAddr]))
-
+	
 server.close()

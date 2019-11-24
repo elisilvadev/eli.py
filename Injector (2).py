@@ -14,10 +14,10 @@
 
 ###############__CONF__###############
 BIND_ADDR = '127.0.0.1'
-BIND_PORT = 8888
-PROXT_ADDR = '66.70.155.130'
+BIND_PORT = 8989
+PROXT_ADDR = '65.27.225.136'
 PROXY_PORT = 80
-PAYLOAD = 'CONNECT [host_port][delay_split][crlf]PUT /? HTTP/1.1[crlf]Host: m.youtube.com.br[crlf]'
+PAYLOAD = 'GET http://minhaclaro.claro.com.br/ HTTP/1.1[crlf]Host: minhaclaro.claro.com.br[crlf][crlf][netData][crlf] [crlf][crlf]'
 
 
 

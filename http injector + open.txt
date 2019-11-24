@@ -1,0 +1,1 @@
+http-proxy 127.0.0.1 8888 route 18.231.95.94 255.255.255.255 net_gateway http-proxy-retry
